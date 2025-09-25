@@ -129,6 +129,8 @@ var tags = { 'azd-env-name': environmentName }
 
 var tempAgentID = !empty(aiAgentID) ? aiAgentID : ''
 var agentID = !empty(azureExistingAgentId) ? azureExistingAgentId : tempAgentID
+// App Configuration store name
+var appConfigStoreName = 'appconfig-${resourceToken}'
 
 var aiChatModel = [
   {
@@ -169,6 +171,18 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   name: !empty(resourceGroupName) ? resourceGroupName : '${abbrs.resourcesResourceGroups}${environmentName}'
   location: location
   tags: tags
+}
+
+// Azure App Configuration store resource
+module appConfig 'core/app-configuration.bicep' = {
+  name: 'app-configuration'
+  scope: rg
+  params: {
+    name: appConfigStoreName
+    location: location
+    tags: tags
+    agentModelName: agentModelName
+  }
 }
 
 var logAnalyticsWorkspaceResolvedName = !useApplicationInsights
@@ -447,3 +461,5 @@ output SERVICE_API_URI string = api.outputs.SERVICE_API_URI
 output SERVICE_API_ENDPOINTS array = ['${api.outputs.SERVICE_API_URI}']
 output SEARCH_CONNECTION_ID string = ''
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApps.outputs.registryLoginServer
+output AZURE_APP_CONFIG_STORE_NAME string = appConfig.outputs.name
+output AZURE_APP_CONFIG_STORE_ENDPOINT string = appConfig.outputs.endpoint
