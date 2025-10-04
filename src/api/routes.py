@@ -15,6 +15,9 @@ from fastapi.responses import JSONResponse
 import logging
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
+# Import config from main
+from .main import config
+
 from azure.ai.agents.aio import AgentsClient
 from azure.ai.agents.models import (
     Agent,
@@ -56,8 +59,8 @@ import secrets
 
 security = HTTPBasic()
 
-username = os.getenv("WEB_APP_USERNAME")
-password = os.getenv("WEB_APP_PASSWORD")
+username = config.get("WEB_APP_USERNAME")
+password = config.get("WEB_APP_PASSWORD")
 basic_auth = username and password
 
 def authenticate(credentials: Optional[HTTPBasicCredentials] = Depends(security)) -> None:
@@ -398,10 +401,10 @@ def run_agent_evaluation(
 async def get_azure_config(_ = auth_dependency):
     """Get Azure configuration for frontend use"""
     try:
-        subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID", "")
-        tenant_id = os.environ.get("AZURE_TENANT_ID", "")
-        resource_group = os.environ.get("AZURE_RESOURCE_GROUP", "")
-        ai_project_resource_id = os.environ.get("AZURE_EXISTING_AIPROJECT_RESOURCE_ID", "")
+        subscription_id = config.get("AZURE_SUBSCRIPTION_ID", "")
+        tenant_id = config.get("AZURE_TENANT_ID", "")
+        resource_group = config.get("AZURE_RESOURCE_GROUP", "")
+        ai_project_resource_id = config.get("AZURE_EXISTING_AIPROJECT_RESOURCE_ID", "")
         
         # Extract resource name and project name from the resource ID
         # Format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.CognitiveServices/accounts/{resource}/projects/{project}

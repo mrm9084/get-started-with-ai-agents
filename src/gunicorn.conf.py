@@ -25,19 +25,35 @@ from azure.identity.aio import DefaultAzureCredential
 from azure.core.credentials_async import AsyncTokenCredential
 
 from dotenv import load_dotenv
+from azure.appconfiguration.provider import load as load_config, SettingSelector
+from azure.identity.aio import DefaultAzureCredential
 
 from logging_config import configure_logging
 
-load_dotenv()
+# Load configuration from Azure App Configuration
+from azure.identity import DefaultAzureCredential
 
-logger = configure_logging(os.getenv("APP_LOG_FILE", ""))
+# Get App Configuration endpoint
+endpoint = (os.getenv("AZURE_APP_CONFIG_ENDPOINT") or 
+           f"https://{os.getenv('AZURE_APP_CONFIG_STORE_NAME')}.azconfig.io" if os.getenv('AZURE_APP_CONFIG_STORE_NAME') else None)
 
+if not endpoint:
+    raise RuntimeError("Azure App Configuration endpoint required. Set AZURE_APP_CONFIG_ENDPOINT or AZURE_APP_CONFIG_STORE_NAME environment variable.")
 
-agentID = os.environ.get("AZURE_EXISTING_AGENT_ID") if os.environ.get(
-    "AZURE_EXISTING_AGENT_ID") else os.environ.get(
-        "AZURE_AI_AGENT_ID")
+# Load configuration from App Configuration
+credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+config = dict(load_config(
+    endpoint=endpoint,
+    credential=credential,
+    selectors=[SettingSelector(key_filter="*")]
+))
+
+logger = configure_logging(config.get("APP_LOG_FILE", ""))
+
+agentID = (config.get("AZURE_EXISTING_AGENT_ID") or 
+           config.get("AZURE_AI_AGENT_ID"))
     
-proj_endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+proj_endpoint = config.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
 
 def list_files_in_files_directory() -> List[str]:    
     # Get the absolute path of the 'files' directory
@@ -65,8 +81,8 @@ async def create_index_maybe(
     :param creds: The credentials, used for the index.
     """
     from api.search_index_manager import SearchIndexManager
-    endpoint = os.environ.get('AZURE_AI_SEARCH_ENDPOINT')
-    embedding = os.getenv('AZURE_AI_EMBED_DEPLOYMENT_NAME')    
+    endpoint = config.get('AZURE_AI_SEARCH_ENDPOINT')
+    embedding = config.get('AZURE_AI_EMBED_DEPLOYMENT_NAME')    
     if endpoint and embedding:
         try:
             aoai_connection = await ai_client.connections.get_default(
@@ -82,7 +98,7 @@ async def create_index_maybe(
         search_mgr = SearchIndexManager(
             endpoint=endpoint,
             credential=creds,
-            index_name=os.getenv('AZURE_AI_SEARCH_INDEX_NAME'),
+            index_name=config.get('AZURE_AI_SEARCH_INDEX_NAME'),
             dimensions=None,
             model=embedding,
             deployment_name=embedding,
@@ -93,7 +109,7 @@ async def create_index_maybe(
         # do not upload the documents.
         if await search_mgr.create_index(
             vector_index_dimensions=int(
-                os.getenv('AZURE_AI_EMBED_DIMENSIONS'))):
+                config.get('AZURE_AI_EMBED_DIMENSIONS')):
             embeddings_path = os.path.join(
                 os.path.dirname(__file__), 'data', 'embeddings.csv')
 
@@ -128,7 +144,7 @@ async def get_available_tool(
     file_ids: List[str] = []
     # First try to get an index search.
     conn_id = ""
-    if os.environ.get('AZURE_AI_SEARCH_INDEX_NAME'):
+    if config.get('AZURE_AI_SEARCH_INDEX_NAME'):
         conn_list = project_client.connections.list()
         async for conn in conn_list:
             if conn.type == ConnectionType.AZURE_AI_SEARCH:
@@ -141,7 +157,7 @@ async def get_available_tool(
 
         return AzureAISearchTool(
             index_connection_id=conn_id,
-            index_name=os.environ.get('AZURE_AI_SEARCH_INDEX_NAME'))
+            index_name=config.get('AZURE_AI_SEARCH_INDEX_NAME'))
     else:
         logger.info(
             "agent: index was not initialized, falling back to file search.")
@@ -174,8 +190,8 @@ async def create_agent(ai_client: AIProjectClient,
     instructions = "Use AI Search always. Avoid to use base knowledge." if isinstance(tool, AzureAISearchTool) else "Use File Search always.  Avoid to use base knowledge."
     
     agent = await ai_client.agents.create_agent(
-        model=os.environ["AZURE_AI_AGENT_DEPLOYMENT_NAME"],
-        name=os.environ["AZURE_AI_AGENT_NAME"],
+        model=config["AZURE_AI_AGENT_DEPLOYMENT_NAME"],
+        name=config["AZURE_AI_AGENT_NAME"],
         instructions=instructions,
         toolset=toolset
     )
@@ -207,7 +223,7 @@ async def initialize_resources():
                 agent_list = ai_client.agents.list_agents()
                 if agent_list:
                     async for agent_object in agent_list:
-                        if agent_object.name == os.environ[
+                        if agent_object.name == config[
                                 "AZURE_AI_AGENT_NAME"]:
                             logger.info(
                                 "Found existing agent named "
@@ -236,7 +252,7 @@ max_requests_jitter = 50
 log_file = "-"
 bind = "0.0.0.0:50505"
 
-if not os.getenv("RUNNING_IN_PRODUCTION"):
+if not config.get("RUNNING_IN_PRODUCTION"):
     reload = True
 
 # Load application code before the worker processes are forked.

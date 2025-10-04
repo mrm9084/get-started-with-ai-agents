@@ -182,6 +182,18 @@ module appConfig 'core/app-configuration.bicep' = {
     location: location
     tags: tags
     agentModelName: agentModelName
+    azureAiAgentName: agentName
+    existingAiProjectEndpoint: projectEndpoint
+    existingAgentId: agentID
+    enableAzureMonitorTracing: string(enableAzureMonitorTracing)
+    searchConnectionName: searchConnectionName
+    embedDeploymentName: embeddingDeploymentName
+    embedDimensions: string(embeddingDeploymentDimensions)
+    searchIndexName: aiSearchIndexName
+    searchEndpoint: searchServiceEndpoint
+    azureTenantId: subscription().tenantId
+    azureSubscriptionId: subscription().subscriptionId
+    azureResourceGroup: rg.name
   }
 }
 
@@ -310,6 +322,8 @@ module api 'api.bicep' = {
     enableAzureMonitorTracing: enableAzureMonitorTracing
     azureTracingGenAIContentRecordingEnabled: azureTracingGenAIContentRecordingEnabled
     projectEndpoint: projectEndpoint
+    appConfigStoreName: appConfig.outputs.name
+    appConfigEndpoint: appConfig.outputs.endpoint
   }
 }
 
@@ -426,6 +440,28 @@ module userRoleSearchServiceContributorRG 'core/security/role.bicep' = if (useSe
   }
 }
 
+// Role assignment for API to read from App Configuration
+module apiRoleAppConfigurationDataReaderRG 'core/security/role.bicep' = {
+  name: 'api-role-app-configuration-data-reader'
+  scope: rg
+  params: {
+    principalType: 'ServicePrincipal'
+    principalId: api.outputs.SERVICE_API_IDENTITY_PRINCIPAL_ID
+    roleDefinitionId: '516239f1-63e1-4d78-a4de-a74fb236a071' // App Configuration Data Reader
+  }
+}
+
+// Role assignment for user to access App Configuration
+module userRoleAppConfigurationDataOwnerRG 'core/security/role.bicep' = {
+  name: 'user-role-app-configuration-data-owner'
+  scope: rg
+  params: {
+    principalType: runnerPrincipalType
+    principalId: principalId
+    roleDefinitionId: '5ae67dd6-50cb-40e7-96ff-dc2bfa4b606b' // App Configuration Data Owner
+  }
+}
+
 module backendRoleAzureAIDeveloperRG 'core/security/role.bicep' = {
   name: 'backend-role-azureai-developer-rg'
   scope: rg
@@ -437,6 +473,8 @@ module backendRoleAzureAIDeveloperRG 'core/security/role.bicep' = {
 }
 
 output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_APP_CONFIG_STORE_NAME string = appConfig.outputs.name
+output AZURE_APP_CONFIG_ENDPOINT string = appConfig.outputs.endpoint
 
 // Outputs required for local development server
 output AZURE_TENANT_ID string = tenant().tenantId
@@ -461,5 +499,3 @@ output SERVICE_API_URI string = api.outputs.SERVICE_API_URI
 output SERVICE_API_ENDPOINTS array = ['${api.outputs.SERVICE_API_URI}']
 output SEARCH_CONNECTION_ID string = ''
 output AZURE_CONTAINER_REGISTRY_ENDPOINT string = containerApps.outputs.registryLoginServer
-output AZURE_APP_CONFIG_STORE_NAME string = appConfig.outputs.name
-output AZURE_APP_CONFIG_STORE_ENDPOINT string = appConfig.outputs.endpoint

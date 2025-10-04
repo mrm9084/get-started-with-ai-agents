@@ -11,19 +11,33 @@ import fastapi
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
+from azure.appconfiguration.provider import load as load_config, SettingSelector
 
 from logging_config import configure_logging
 
 enable_trace = False
 logger = None
 
+# Load configuration from Azure App Configuration
+endpoint = (os.getenv("AZURE_APP_CONFIG_ENDPOINT") or 
+           f"https://{os.getenv('AZURE_APP_CONFIG_STORE_NAME')}.azconfig.io" if os.getenv('AZURE_APP_CONFIG_STORE_NAME') else None)
+
+if not endpoint:
+    raise RuntimeError("Azure App Configuration endpoint required. Set AZURE_APP_CONFIG_ENDPOINT or AZURE_APP_CONFIG_STORE_NAME environment variable.")
+
+credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
+config = dict(load_config(
+    endpoint=endpoint,
+    credential=credential,
+    selectors=[SettingSelector(key_filter="*")]
+))
+
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     agent = None
 
-    proj_endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
-    agent_id = os.environ.get("AZURE_EXISTING_AGENT_ID")
+    proj_endpoint = config.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+    agent_id = config.get("AZURE_EXISTING_AGENT_ID")
     try:
         ai_project = AIProjectClient(
             credential=DefaultAzureCredential(exclude_shared_token_cache_credential=True),
@@ -60,7 +74,9 @@ async def lifespan(app: fastapi.FastAPI):
 
         if not agent:
             # Fallback to searching by name
-            agent_name = os.environ["AZURE_AI_AGENT_NAME"]
+            agent_name = config.get("AZURE_AI_AGENT_NAME")
+            if not agent_name:
+                raise ValueError("Required configuration key 'AZURE_AI_AGENT_NAME' not found")
             agent_list = ai_project.agents.list_agents()
             if agent_list:
                 async for agent_object in agent_list:
@@ -90,19 +106,11 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 def create_app():
-    if not os.getenv("RUNNING_IN_PRODUCTION"):
-        load_dotenv(override=True)
-
     global logger
-    logger = configure_logging(os.getenv("APP_LOG_FILE", ""))
+    logger = configure_logging(config.get("APP_LOG_FILE", ""))
 
-    enable_trace_string = os.getenv("ENABLE_AZURE_MONITOR_TRACING", "")
     global enable_trace
-    enable_trace = False
-    if enable_trace_string == "":
-        enable_trace = False
-    else:
-        enable_trace = str(enable_trace_string).lower() == "true"
+    enable_trace = str(config.get("ENABLE_AZURE_MONITOR_TRACING", "false")).lower() == "true"
     if enable_trace:
         logger.info("Tracing is enabled.")
         try:

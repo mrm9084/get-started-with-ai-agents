@@ -17,6 +17,8 @@ param agentID string
 param enableAzureMonitorTracing bool
 param azureTracingGenAIContentRecordingEnabled bool
 param projectEndpoint string
+param appConfigStoreName string
+param appConfigEndpoint string
 
 resource apiIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: identityName
@@ -79,6 +81,14 @@ var env = [
   {
     name: 'AZURE_EXISTING_AIPROJECT_ENDPOINT'
     value: projectEndpoint
+  }
+  {
+    name: 'AZURE_APP_CONFIG_STORE_NAME'
+    value: appConfigStoreName
+  }
+  {
+    name: 'AZURE_APP_CONFIG_ENDPOINT'
+    value: appConfigEndpoint
   }
 ]
 

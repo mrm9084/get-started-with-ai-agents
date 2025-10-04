@@ -22,6 +22,28 @@ if [ "$Errors" -gt 0 ]; then
     exit 1
 fi
 
+# --- Function to get configuration from Azure App Configuration ---
+get_appconfig_value() {
+    local key="$1"
+    local default_value="$2"
+    
+    local app_config_name="${AZURE_APP_CONFIG_STORE_NAME}"
+    
+    if [ -n "$app_config_name" ]; then
+        local value
+        if value=$(az appconfig kv show --name "$app_config_name" --key "$key" --query "value" --output tsv 2>/dev/null); then
+            if [ -n "$value" ] && [ "$value" != "null" ] && [ -n "${value// }" ]; then
+                echo "✅ Retrieved $key from App Configuration: $value" >&2
+                echo "$value"
+                return
+            fi
+        fi
+        echo "⚠️ Could not retrieve $key from App Configuration, using default: $default_value" >&2
+    fi
+    
+    echo "$default_value"
+}
+
 # --- Default Values ---
 declare -A defaultEnvVars=(
     [AZURE_AI_EMBED_DEPLOYMENT_NAME]="text-embedding-3-small"
@@ -30,8 +52,8 @@ declare -A defaultEnvVars=(
     [AZURE_AI_EMBED_MODEL_VERSION]="1"
     [AZURE_AI_EMBED_DEPLOYMENT_SKU]="Standard"
     [AZURE_AI_EMBED_DEPLOYMENT_CAPACITY]="50"
-    [AZURE_AI_AGENT_DEPLOYMENT_NAME]="gpt-4o-mini"
-    [AZURE_AI_AGENT_MODEL_NAME]="gpt-4o-mini"
+    [AZURE_AI_AGENT_DEPLOYMENT_NAME]="$(get_appconfig_value 'AZURE_AI_AGENT_MODEL_NAME' 'gpt-4o-mini')"
+    [AZURE_AI_AGENT_MODEL_NAME]="$(get_appconfig_value 'AZURE_AI_AGENT_MODEL_NAME' 'gpt-4o-mini')"
     [AZURE_AI_AGENT_MODEL_VERSION]="2024-07-18"
     [AZURE_AI_AGENT_MODEL_FORMAT]="OpenAI"
     [AZURE_AI_AGENT_DEPLOYMENT_SKU]="GlobalStandard"
