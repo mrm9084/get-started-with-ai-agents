@@ -50,6 +50,36 @@ param azureSubscriptionId string = ''
 @description('Azure Resource Group')
 param azureResourceGroup string = ''
 
+@description('Azure AI Agent Deployment Name')
+param agentDeploymentName string = ''
+
+@description('Azure AI Agent Model Version')
+param agentModelVersion string = ''
+
+@description('Azure AI Agent Model Format')
+param agentModelFormat string = ''
+
+@description('Azure AI Agent Deployment SKU')
+param agentDeploymentSku string = ''
+
+@description('Azure AI Agent Deployment Capacity')
+param agentDeploymentCapacity string = ''
+
+@description('Azure AI Embed Model Name')
+param embedModelName string = ''
+
+@description('Azure AI Embed Model Version')
+param embedModelVersion string = ''
+
+@description('Azure AI Embed Model Format')
+param embedModelFormat string = ''
+
+@description('Azure AI Embed Deployment SKU')
+param embedDeploymentSku string = ''
+
+@description('Azure AI Embed Deployment Capacity')
+param embedDeploymentCapacity string = ''
+
 resource appConfig 'Microsoft.AppConfiguration/configurationStores@2023-03-01' = {
   name: name
   location: location
@@ -174,6 +204,96 @@ resource azureResourceGroupConfig 'Microsoft.AppConfiguration/configurationStore
   parent: appConfig
   properties: {
     value: azureResourceGroup
+  }
+}
+
+// Set the AZURE_AI_AGENT_DEPLOYMENT_NAME configuration key
+resource agentDeploymentNameConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (agentDeploymentName != '') {
+  name: 'AZURE_AI_AGENT_DEPLOYMENT_NAME'
+  parent: appConfig
+  properties: {
+    value: agentDeploymentName
+  }
+}
+
+// Set the AZURE_AI_AGENT_MODEL_VERSION configuration key
+resource agentModelVersionConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (agentModelVersion != '') {
+  name: 'AZURE_AI_AGENT_MODEL_VERSION'
+  parent: appConfig
+  properties: {
+    value: agentModelVersion
+  }
+}
+
+// Set the AZURE_AI_AGENT_MODEL_FORMAT configuration key
+resource agentModelFormatConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (agentModelFormat != '') {
+  name: 'AZURE_AI_AGENT_MODEL_FORMAT'
+  parent: appConfig
+  properties: {
+    value: agentModelFormat
+  }
+}
+
+// Set the AZURE_AI_AGENT_DEPLOYMENT_SKU configuration key
+resource agentDeploymentSkuConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (agentDeploymentSku != '') {
+  name: 'AZURE_AI_AGENT_DEPLOYMENT_SKU'
+  parent: appConfig
+  properties: {
+    value: agentDeploymentSku
+  }
+}
+
+// Set the AZURE_AI_AGENT_DEPLOYMENT_CAPACITY configuration key
+resource agentDeploymentCapacityConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (agentDeploymentCapacity != '') {
+  name: 'AZURE_AI_AGENT_DEPLOYMENT_CAPACITY'
+  parent: appConfig
+  properties: {
+    value: agentDeploymentCapacity
+  }
+}
+
+// Set the AZURE_AI_EMBED_MODEL_NAME configuration key
+resource embedModelNameConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (embedModelName != '') {
+  name: 'AZURE_AI_EMBED_MODEL_NAME'
+  parent: appConfig
+  properties: {
+    value: embedModelName
+  }
+}
+
+// Set the AZURE_AI_EMBED_MODEL_VERSION configuration key
+resource embedModelVersionConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (embedModelVersion != '') {
+  name: 'AZURE_AI_EMBED_MODEL_VERSION'
+  parent: appConfig
+  properties: {
+    value: embedModelVersion
+  }
+}
+
+// Set the AZURE_AI_EMBED_MODEL_FORMAT configuration key
+resource embedModelFormatConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (embedModelFormat != '') {
+  name: 'AZURE_AI_EMBED_MODEL_FORMAT'
+  parent: appConfig
+  properties: {
+    value: embedModelFormat
+  }
+}
+
+// Set the AZURE_AI_EMBED_DEPLOYMENT_SKU configuration key
+resource embedDeploymentSkuConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (embedDeploymentSku != '') {
+  name: 'AZURE_AI_EMBED_DEPLOYMENT_SKU'
+  parent: appConfig
+  properties: {
+    value: embedDeploymentSku
+  }
+}
+
+// Set the AZURE_AI_EMBED_DEPLOYMENT_CAPACITY configuration key
+resource embedDeploymentCapacityConfig 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = if (embedDeploymentCapacity != '') {
+  name: 'AZURE_AI_EMBED_DEPLOYMENT_CAPACITY'
+  parent: appConfig
+  properties: {
+    value: embedDeploymentCapacity
   }
 }
 

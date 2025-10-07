@@ -194,6 +194,16 @@ module appConfig 'core/app-configuration.bicep' = {
     azureTenantId: subscription().tenantId
     azureSubscriptionId: subscription().subscriptionId
     azureResourceGroup: rg.name
+    agentDeploymentName: agentDeploymentName
+    agentModelVersion: agentModelVersion
+    agentModelFormat: agentModelFormat
+    agentDeploymentSku: agentDeploymentSku
+    agentDeploymentCapacity: string(agentDeploymentCapacity)
+    embedModelName: embedModelName
+    embedModelVersion: embedModelVersion
+    embedModelFormat: embedModelFormat
+    embedDeploymentSku: embedDeploymentSku
+    embedDeploymentCapacity: string(embedDeploymentCapacity)
   }
 }
 

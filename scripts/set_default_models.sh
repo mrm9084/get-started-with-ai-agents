@@ -22,42 +22,61 @@ if [ "$Errors" -gt 0 ]; then
     exit 1
 fi
 
-# --- Function to get configuration from Azure App Configuration ---
-get_appconfig_value() {
-    local key="$1"
-    local default_value="$2"
-    
+# --- Function to get all AZURE_AI configuration values from Azure App Configuration ---
+get_appconfig_values() {
     local app_config_name="${AZURE_APP_CONFIG_STORE_NAME}"
     
     if [ -n "$app_config_name" ]; then
-        local value
-        if value=$(az appconfig kv show --name "$app_config_name" --key "$key" --query "value" --output tsv 2>/dev/null); then
-            if [ -n "$value" ] && [ "$value" != "null" ] && [ -n "${value// }" ]; then
-                echo "✅ Retrieved $key from App Configuration: $value" >&2
-                echo "$value"
-                return
+        echo "🔍 Retrieving AZURE_AI* configuration from App Configuration..." >&2
+        local json_result
+        if json_result=$(az appconfig kv list --name "$app_config_name" --key "AZURE_AI*" --query "[].{key:key, value:value}" --output json 2>/dev/null); then
+            if [ -n "$json_result" ] && [ "$json_result" != "[]" ]; then
+                # Parse JSON and populate associative array
+                while IFS= read -r line; do
+                    local key=$(echo "$line" | jq -r '.key')
+                    local value=$(echo "$line" | jq -r '.value')
+                    if [ -n "$value" ] && [ "$value" != "null" ] && [ -n "${value// }" ]; then
+                        declare -g "appconfig_${key//./_}"="$value"
+                        echo "✅ Retrieved $key: $value" >&2
+                    fi
+                done <<< "$(echo "$json_result" | jq -c '.[]')"
             fi
+        else
+            echo "⚠️ Could not retrieve configuration from App Configuration, using defaults" >&2
         fi
-        echo "⚠️ Could not retrieve $key from App Configuration, using default: $default_value" >&2
     fi
-    
-    echo "$default_value"
 }
+
+# --- Function to get config value with fallback to default ---
+get_config_value() {
+    local key="$1"
+    local default_value="$2"
+    local var_name="appconfig_${key//./_}"
+    
+    if [ -n "${!var_name}" ]; then
+        echo "${!var_name}"
+    else
+        echo "$default_value"
+    fi
+}
+
+# --- Get all App Configuration values once ---
+get_appconfig_values
 
 # --- Default Values ---
 declare -A defaultEnvVars=(
-    [AZURE_AI_EMBED_DEPLOYMENT_NAME]="text-embedding-3-small"
-    [AZURE_AI_EMBED_MODEL_NAME]="text-embedding-3-small"
-    [AZURE_AI_EMBED_MODEL_FORMAT]="OpenAI"
-    [AZURE_AI_EMBED_MODEL_VERSION]="1"
-    [AZURE_AI_EMBED_DEPLOYMENT_SKU]="Standard"
-    [AZURE_AI_EMBED_DEPLOYMENT_CAPACITY]="50"
-    [AZURE_AI_AGENT_DEPLOYMENT_NAME]="$(get_appconfig_value 'AZURE_AI_AGENT_MODEL_NAME' 'gpt-4o-mini')"
-    [AZURE_AI_AGENT_MODEL_NAME]="$(get_appconfig_value 'AZURE_AI_AGENT_MODEL_NAME' 'gpt-4o-mini')"
-    [AZURE_AI_AGENT_MODEL_VERSION]="2024-07-18"
-    [AZURE_AI_AGENT_MODEL_FORMAT]="OpenAI"
-    [AZURE_AI_AGENT_DEPLOYMENT_SKU]="GlobalStandard"
-    [AZURE_AI_AGENT_DEPLOYMENT_CAPACITY]="80"
+    [AZURE_AI_EMBED_DEPLOYMENT_NAME]="$(get_config_value 'AZURE_AI_EMBED_DEPLOYMENT_NAME' 'text-embedding-3-small')"
+    [AZURE_AI_EMBED_MODEL_NAME]="$(get_config_value 'AZURE_AI_EMBED_MODEL_NAME' 'text-embedding-3-small')"
+    [AZURE_AI_EMBED_MODEL_FORMAT]="$(get_config_value 'AZURE_AI_EMBED_MODEL_FORMAT' 'OpenAI')"
+    [AZURE_AI_EMBED_MODEL_VERSION]="$(get_config_value 'AZURE_AI_EMBED_MODEL_VERSION' '1')"
+    [AZURE_AI_EMBED_DEPLOYMENT_SKU]="$(get_config_value 'AZURE_AI_EMBED_DEPLOYMENT_SKU' 'Standard')"
+    [AZURE_AI_EMBED_DEPLOYMENT_CAPACITY]="$(get_config_value 'AZURE_AI_EMBED_DEPLOYMENT_CAPACITY' '50')"
+    [AZURE_AI_AGENT_DEPLOYMENT_NAME]="$(get_config_value 'AZURE_AI_AGENT_DEPLOYMENT_NAME' 'gpt-4o-mini')"
+    [AZURE_AI_AGENT_MODEL_NAME]="$(get_config_value 'AZURE_AI_AGENT_MODEL_NAME' 'gpt-4o-mini')"
+    [AZURE_AI_AGENT_MODEL_VERSION]="$(get_config_value 'AZURE_AI_AGENT_MODEL_VERSION' '2024-07-18')"
+    [AZURE_AI_AGENT_MODEL_FORMAT]="$(get_config_value 'AZURE_AI_AGENT_MODEL_FORMAT' 'OpenAI')"
+    [AZURE_AI_AGENT_DEPLOYMENT_SKU]="$(get_config_value 'AZURE_AI_AGENT_DEPLOYMENT_SKU' 'GlobalStandard')"
+    [AZURE_AI_AGENT_DEPLOYMENT_CAPACITY]="$(get_config_value 'AZURE_AI_AGENT_DEPLOYMENT_CAPACITY' '80')"
 )
 
 # --- Set Env Vars and azd env ---
