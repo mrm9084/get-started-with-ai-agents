@@ -11,7 +11,7 @@ import fastapi
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from azure.appconfiguration.provider import load as load_config, SettingSelector
+from azure.appconfiguration.provider import load, SettingSelector
 
 from logging_config import configure_logging
 
@@ -26,11 +26,11 @@ if not endpoint:
     raise RuntimeError("Azure App Configuration endpoint required. Set AZURE_APP_CONFIG_ENDPOINT or AZURE_APP_CONFIG_STORE_NAME environment variable.")
 
 credential = DefaultAzureCredential(exclude_shared_token_cache_credential=True)
-config = dict(load_config(
+config = load(
     endpoint=endpoint,
     credential=credential,
     selectors=[SettingSelector(key_filter="*")]
-))
+)
 
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
