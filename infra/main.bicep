@@ -114,9 +114,6 @@ param enableAzureMonitorTracing bool = false
 @description('Do we want to use the Azure Monitor tracing for GenAI content recording')
 param azureTracingGenAIContentRecordingEnabled bool = false
 
-@description('Skip static model deployment in Bicep - models will be deployed dynamically via postdeploy script')
-param skipStaticModelDeployment bool = false
-
 param templateValidationMode bool = false
 
 @description('Random seed to be used during generation of new resources suffixes.')
@@ -231,7 +228,7 @@ module ai 'core/host/ai-environment.bicep' = if (empty(azureExistingAIProjectRes
       : '${abbrs.storageStorageAccounts}${resourceToken}'
     aiServicesName: !empty(aiServicesName) ? aiServicesName : 'aoai-${resourceToken}'
     aiProjectName: !empty(aiProjectName) ? aiProjectName : 'proj-${resourceToken}'
-    aiServiceModelDeployments: skipStaticModelDeployment ? [] : aiDeployments
+    aiServiceModelDeployments: aiDeployments
     logAnalyticsName: logAnalyticsWorkspaceResolvedName
     applicationInsightsName: !useApplicationInsights
       ? ''
