@@ -6,6 +6,9 @@ import os
 
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from azure.appconfiguration.provider.aio import load
+from azure.identity.aio import DefaultAzureCredential
+    
 
 import fastapi
 from fastapi.staticfiles import StaticFiles
@@ -21,9 +24,13 @@ logger = None
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     agent = None
+    
+    endpoint = os.environ.get("AZURE_APPCONFIG_ENDPOINT")
+    app.state.config_provider = await load(endpoint=endpoint, credential=DefaultAzureCredential())
 
-    proj_endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
-    agent_id = os.environ.get("AZURE_EXISTING_AGENT_ID")
+    proj_endpoint = app.state.config_provider.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+    agent_id = app.state.config_provider.get("AZURE_EXISTING_AGENT_ID")
+
     try:
         ai_project = AIProjectClient(
             credential=DefaultAzureCredential(exclude_shared_token_cache_credential=True),
@@ -60,7 +67,7 @@ async def lifespan(app: fastapi.FastAPI):
 
         if not agent:
             # Fallback to searching by name
-            agent_name = os.environ["AZURE_AI_AGENT_NAME"]
+            agent_name = app.state.config_provider.get("AZURE_AI_AGENT_NAME")
             agent_list = ai_project.agents.list_agents()
             if agent_list:
                 async for agent_object in agent_list:
@@ -96,6 +103,8 @@ def create_app():
     global logger
     logger = configure_logging(os.getenv("APP_LOG_FILE", ""))
 
+    # Note: App Configuration will be initialized in the lifespan function
+    # For now, use environment variables for app startup configuration
     enable_trace_string = os.getenv("ENABLE_AZURE_MONITOR_TRACING", "")
     global enable_trace
     enable_trace = False

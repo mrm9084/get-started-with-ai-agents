@@ -56,13 +56,11 @@ import secrets
 
 security = HTTPBasic()
 
-username = os.getenv("WEB_APP_USERNAME")
-password = os.getenv("WEB_APP_PASSWORD")
-basic_auth = username and password
-
-def authenticate(credentials: Optional[HTTPBasicCredentials] = Depends(security)) -> None:
-
-    if not basic_auth:
+def authenticate(request: Request, credentials: Optional[HTTPBasicCredentials] = Depends(security)) -> None:
+    username = request.app.state.config_provider.get("WEB_APP_USERNAME")
+    password = request.app.state.config_provider.get("WEB_APP_PASSWORD")
+    
+    if not username or not password:
         logger.info("Skipping authentication: WEB_APP_USERNAME or WEB_APP_PASSWORD not set.")
         return
     
@@ -76,7 +74,7 @@ def authenticate(credentials: Optional[HTTPBasicCredentials] = Depends(security)
         )
     return
 
-auth_dependency = Depends(authenticate) if basic_auth else None
+auth_dependency = Depends(authenticate)
 
 
 def get_ai_project(request: Request) -> AIProjectClient:
@@ -289,6 +287,7 @@ async def chat(
     app_insights_conn_str : str = Depends(get_app_insights_conn_str),
 	_ = auth_dependency
 ):
+    await request.app.state.config_provider.refresh()
     # Retrieve the thread ID from the cookies (if available).
     thread_id = request.cookies.get('thread_id')
     agent_id = request.cookies.get('agent_id')
@@ -395,14 +394,14 @@ def run_agent_evaluation(
 
 
 @router.get("/config/azure")
-async def get_azure_config(_ = auth_dependency):
+async def get_azure_config(request: Request, _ = auth_dependency):
     """Get Azure configuration for frontend use"""
     try:
-        subscription_id = os.environ.get("AZURE_SUBSCRIPTION_ID", "")
-        tenant_id = os.environ.get("AZURE_TENANT_ID", "")
-        resource_group = os.environ.get("AZURE_RESOURCE_GROUP", "")
-        ai_project_resource_id = os.environ.get("AZURE_EXISTING_AIPROJECT_RESOURCE_ID", "")
         
+        subscription_id = request.app.state.config_provider.get("AZURE_SUBSCRIPTION_ID")
+        tenant_id = request.app.state.config_provider.get("AZURE_TENANT_ID")
+        resource_group = request.app.state.config_provider.get("AZURE_RESOURCE_GROUP")
+        ai_project_resource_id = request.app.state.config_provider.get("AZURE_EXISTING_AIPROJECT_RESOURCE_ID")
         # Extract resource name and project name from the resource ID
         # Format: /subscriptions/{sub}/resourceGroups/{rg}/providers/Microsoft.CognitiveServices/accounts/{resource}/projects/{project}
         resource_name = ""

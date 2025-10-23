@@ -114,6 +114,12 @@ param enableAzureMonitorTracing bool = false
 @description('Do we want to use the Azure Monitor tracing for GenAI content recording')
 param azureTracingGenAIContentRecordingEnabled bool = false
 
+@description('Do we want to use Azure App Configuration for centralized configuration management')
+param useAppConfiguration bool = false
+
+@description('The App Configuration resource name. If omitted will be generated')
+param appConfigurationName string = ''
+
 param templateValidationMode bool = false
 
 @description('Random seed to be used during generation of new resources suffixes.')
