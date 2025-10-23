@@ -114,6 +114,9 @@ param enableAzureMonitorTracing bool = false
 @description('Do we want to use the Azure Monitor tracing for GenAI content recording')
 param azureTracingGenAIContentRecordingEnabled bool = false
 
+@description('Skip static model deployment in Bicep - models will be deployed dynamically via postdeploy script')
+param skipStaticModelDeployment bool = false
+
 param templateValidationMode bool = false
 
 @description('Random seed to be used during generation of new resources suffixes.')
@@ -171,6 +174,41 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   tags: tags
 }
 
+// Azure App Configuration store resource
+module appConfig 'core/app-configuration.bicep' = {
+  name: 'app-configuration'
+  scope: rg
+  params: {
+    name: appConfigStoreName
+    location: location
+    tags: tags
+    agentModelName: agentModelName
+    azureAiAgentName: agentName
+    existingAiProjectEndpoint: projectEndpoint
+    existingAgentId: agentID
+    enableAzureMonitorTracing: string(enableAzureMonitorTracing)
+    searchConnectionName: searchConnectionName
+    embedDeploymentName: embeddingDeploymentName
+    embedDimensions: string(embeddingDeploymentDimensions)
+    searchIndexName: aiSearchIndexName
+    searchEndpoint: searchServiceEndpoint
+    azureTenantId: subscription().tenantId
+    azureSubscriptionId: subscription().subscriptionId
+    azureResourceGroup: rg.name
+    agentDeploymentName: agentDeploymentName
+    agentModelVersion: agentModelVersion
+    agentModelFormat: agentModelFormat
+    agentDeploymentSku: agentDeploymentSku
+    agentDeploymentCapacity: string(agentDeploymentCapacity)
+    embedModelName: embedModelName
+    embedModelVersion: embedModelVersion
+    embedModelFormat: embedModelFormat
+    embedDeploymentSku: embedDeploymentSku
+    embedDeploymentCapacity: string(embedDeploymentCapacity)
+    aiServiceName: empty(azureExistingAIProjectResourceId) ? (!empty(aiServicesName) ? aiServicesName : 'aoai-${resourceToken}') : ''
+  }
+}
+
 var logAnalyticsWorkspaceResolvedName = !useApplicationInsights
   ? ''
   : !empty(logAnalyticsWorkspaceName)
@@ -193,7 +231,7 @@ module ai 'core/host/ai-environment.bicep' = if (empty(azureExistingAIProjectRes
       : '${abbrs.storageStorageAccounts}${resourceToken}'
     aiServicesName: !empty(aiServicesName) ? aiServicesName : 'aoai-${resourceToken}'
     aiProjectName: !empty(aiProjectName) ? aiProjectName : 'proj-${resourceToken}'
-    aiServiceModelDeployments: aiDeployments
+    aiServiceModelDeployments: skipStaticModelDeployment ? [] : aiDeployments
     logAnalyticsName: logAnalyticsWorkspaceResolvedName
     applicationInsightsName: !useApplicationInsights
       ? ''
@@ -423,6 +461,9 @@ module backendRoleAzureAIDeveloperRG 'core/security/role.bicep' = {
 }
 
 output AZURE_RESOURCE_GROUP string = rg.name
+output AZURE_APP_CONFIG_STORE_NAME string = appConfig.outputs.name
+output AZURE_APP_CONFIG_ENDPOINT string = appConfig.outputs.endpoint
+output AZURE_AISERVICES_NAME string = empty(azureExistingAIProjectResourceId) ? ai!.outputs.aiServicesName : ''
 
 // Outputs required for local development server
 output AZURE_TENANT_ID string = tenant().tenantId

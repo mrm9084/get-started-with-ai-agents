@@ -115,6 +115,9 @@
     },
     "templateValidationMode": {
       "value": "${TEMPLATE_VALIDATION_MODE=false}"
+    },
+    "skipStaticModelDeployment": {
+      "value": "${SKIP_STATIC_MODEL_DEPLOYMENT=false}"
     }
   }
 }

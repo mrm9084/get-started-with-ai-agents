@@ -70,11 +70,11 @@ var env = [
   }
   {
     name: 'ENABLE_AZURE_MONITOR_TRACING'
-    value: enableAzureMonitorTracing
+    value: string(enableAzureMonitorTracing)
   }
   {
     name: 'AZURE_TRACING_GEN_AI_CONTENT_RECORDING_ENABLED'
-    value: azureTracingGenAIContentRecordingEnabled
+    value: string(azureTracingGenAIContentRecordingEnabled)
   }
   {
     name: 'AZURE_EXISTING_AIPROJECT_ENDPOINT'
@@ -95,6 +95,7 @@ module app 'core/host/container-app-upsert.bicep' = {
     containerAppsEnvironmentName: containerAppsEnvironmentName
     targetPort: 50505
     env: env
+    exists: false  // Let azd handle the initial deployment properly
   }
 }
 
