@@ -171,6 +171,8 @@ resource rg 'Microsoft.Resources/resourceGroups@2021-04-01' = {
   tags: tags
 }
 
+var appConfigStoreName = '${abbrs.appConfigurationStores}${resourceToken}'
+
 // Azure App Configuration store resource
 module appConfig 'core/app-configuration.bicep' = {
   name: 'app-configuration'
@@ -215,7 +217,6 @@ var logAnalyticsWorkspaceResolvedName = !useApplicationInsights
 var resolvedSearchServiceName = !useSearchService
   ? ''
   : !empty(searchServiceName) ? searchServiceName : '${abbrs.searchSearchServices}${resourceToken}'
-  
 
 module ai 'core/host/ai-environment.bicep' = if (empty(azureExistingAIProjectResourceId)) {
   name: 'ai'
