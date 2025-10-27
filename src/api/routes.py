@@ -56,11 +56,14 @@ import secrets
 
 security = HTTPBasic()
 
-def authenticate(request: Request, credentials: Optional[HTTPBasicCredentials] = Depends(security)) -> None:
-    username = request.app.state.config_provider.get("WEB_APP_USERNAME")
-    password = request.app.state.config_provider.get("WEB_APP_PASSWORD")
-    
-    if not username or not password:
+
+username = os.getenv("WEB_APP_USERNAME")
+password = os.getenv("WEB_APP_PASSWORD")
+basic_auth = username and password
+
+def authenticate(credentials: Optional[HTTPBasicCredentials] = Depends(security)) -> None:
+
+    if not basic_auth:
         logger.info("Skipping authentication: WEB_APP_USERNAME or WEB_APP_PASSWORD not set.")
         return
     
@@ -74,7 +77,7 @@ def authenticate(request: Request, credentials: Optional[HTTPBasicCredentials] =
         )
     return
 
-auth_dependency = Depends(authenticate)
+auth_dependency = Depends(authenticate) if basic_auth else None
 
 
 def get_ai_project(request: Request) -> AIProjectClient:
