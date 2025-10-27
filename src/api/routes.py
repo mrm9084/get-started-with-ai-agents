@@ -86,7 +86,7 @@ def get_ai_project(request: Request) -> AIProjectClient:
 def get_agent_client(request: Request) -> AgentsClient:
     return request.app.state.agent_client
 
-def get_agent(request: Request) -> tuple[Agent, str]:
+async def get_agent(request: Request) -> tuple[Agent, str]:
     session_id = request.cookies.get('session_id')
     if not session_id:
         # new user generating new uuid
@@ -104,23 +104,32 @@ def get_agent(request: Request) -> tuple[Agent, str]:
         if agent.name == assigned_agent_name:
             return agent, session_id
         
-    agent_list = request.app.state.ai_project
-    agent = None
-    if agent_list:
-        known_agents = []
-        for agent in request.app.state.agents:
-            known_agents.append(agent.name)
-        async for agent_object in agent_list:
-            # Update the known agents list
-            if agent_object.name not in known_agents:
-                request.app.state.agents.append(agent_object)
-            if agent_object.name == assigned_agent_name:
-                # Found the new assigned agent
-                agent = agent_object
+    # If not found in cached agents, try to fetch from AI project
+    ai_project = request.app.state.ai_project
+    found_agent = None
+    if ai_project and hasattr(ai_project, 'agents'):
+        try:
+            known_agents = [agent.name for agent in request.app.state.agents]
+            agents_client = ai_project.agents
+            
+            # List agents from the AI project
+            agents_response = agents_client.list()
+            async for agent_object in agents_response:
+                # Update the known agents list with any new agents
+                if agent_object.name not in known_agents:
+                    request.app.state.agents.append(agent_object)
+                    logger.info(f"Added new agent to cache: {agent_object.name}")
+                    
+                # Check if this is the assigned agent we're looking for
+                if agent_object.name == assigned_agent_name:
+                    found_agent = agent_object
+        except Exception as e:
+            logger.error(f"Error fetching agents from AI project: {e}")
 
-    if agent:
-        return agent, session_id
-
+    # Return the found agent or default
+    if found_agent:
+        return found_agent, session_id
+    
     logger.warning(f"Assigned agent not found: {assigned_agent_name}")
     return default_agent, session_id
 
@@ -267,7 +276,7 @@ async def history(
 ):
     with tracer.start_as_current_span("chat_history"):
         # Get agent and session ID
-        agent, session_id = get_agent(request)
+        agent, session_id = await get_agent(request)
         
         # Retrieve the thread ID from the cookies (if available).
         thread_id = request.cookies.get('thread_id')
@@ -318,7 +327,7 @@ async def history(
 async def get_chat_agent(
     request: Request
 ):
-    agent, _ = get_agent(request)
+    agent, _ = await get_agent(request)
     return JSONResponse(content=agent.as_dict())  
 
 @router.post("/chat")
@@ -331,7 +340,7 @@ async def chat(
     await request.app.state.config_provider.refresh()
     
     # Get agent and session ID
-    agent, session_id = get_agent(request)
+    agent, session_id = await get_agent(request)
     
     # Retrieve the thread ID from the cookies (if available).
     thread_id = request.cookies.get('thread_id')
