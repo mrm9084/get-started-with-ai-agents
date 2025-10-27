@@ -37,6 +37,7 @@ async def lifespan(app: fastapi.FastAPI):
             endpoint=proj_endpoint,
             api_version = "2025-05-15-preview" # Evaluations yet not supported on stable (api_version="2025-05-01")
         )
+        app.state.ai_project = ai_project
         logger.info("Created AIProjectClient")
 
         if enable_trace:

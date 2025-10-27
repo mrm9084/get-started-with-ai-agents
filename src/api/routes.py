@@ -89,13 +89,38 @@ def get_agent_client(request: Request) -> AgentsClient:
 def get_agent(request: Request) -> tuple[Agent, str]:
     session_id = request.cookies.get('session_id')
     if not session_id:
+        # new user generating new uuid
         session_id = str(uuid.uuid4())
+    
+    # App Config Assigned model
     assigned_agent_name = request.app.state.feature_manager.get_variant("AiModel", session_id).configuration
+
+    # Default Model if assigned on not found
     default_agent = request.app.state.agents[0] if request.app.state.agents else None
+
     logger.info(f"Assigned agent: {assigned_agent_name}")
+    # Known agents
     for agent in request.app.state.agents:
         if agent.name == assigned_agent_name:
             return agent, session_id
+        
+    agent_list = request.app.state.ai_project
+    agent = None
+    if agent_list:
+        known_agents = []
+        for agent in request.app.state.agents:
+            known_agents.append(agent.name)
+        async for agent_object in agent_list:
+            # Update the known agents list
+            if agent_object.name not in known_agents:
+                request.app.state.agents.append(agent_object)
+            if agent_object.name == assigned_agent_name:
+                # Found the new assigned agent
+                agent = agent_object
+
+    if agent:
+        return agent, session_id
+
     logger.warning(f"Assigned agent not found: {assigned_agent_name}")
     return default_agent, session_id
 
