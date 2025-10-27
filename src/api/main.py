@@ -5,9 +5,10 @@ import contextlib
 import os
 
 from azure.ai.projects.aio import AIProjectClient
-from azure.identity import DefaultAzureCredential
-from azure.appconfiguration.provider.aio import load
+from azure.identity import DefaultAzureCredential as SyncCredential
+from azure.appconfiguration.provider import load
 from azure.identity.aio import DefaultAzureCredential
+from featuremanagement import FeatureManager
     
 
 import fastapi
@@ -25,15 +26,15 @@ logger = None
 async def lifespan(app: fastapi.FastAPI):
     agent = None
     
-    endpoint = os.environ.get("AZURE_APPCONFIG_ENDPOINT")
-    app.state.config_provider = await load(endpoint=endpoint, credential=DefaultAzureCredential())
+    app.state.config_provider = load(endpoint, SyncCredential(), feature_flag_enabled=True)
+    app.state.feature_manager = FeatureManager(app.state.config_provider)
 
     proj_endpoint = app.state.config_provider.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
     agent_id = app.state.config_provider.get("AZURE_EXISTING_AGENT_ID")
 
     try:
         ai_project = AIProjectClient(
-            credential=DefaultAzureCredential(exclude_shared_token_cache_credential=True),
+            credential=DefaultAzureCredential(),
             endpoint=proj_endpoint,
             api_version = "2025-05-15-preview" # Evaluations yet not supported on stable (api_version="2025-05-01")
         )
@@ -67,7 +68,7 @@ async def lifespan(app: fastapi.FastAPI):
 
         if not agent:
             # Fallback to searching by name
-            agent_name = app.state.config_provider.get("AZURE_AI_AGENT_NAME")
+            agent_name = app.state.feature_manager.get_variant("AiModel")
             agent_list = ai_project.agents.list_agents()
             if agent_list:
                 async for agent_object in agent_list:

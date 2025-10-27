@@ -3,6 +3,7 @@ uvicorn[standard]==0.29.0
 gunicorn==23.0.0
 azure-identity==1.19.0
 azure-appconfiguration-provider==2.2.0
+featuremanagement
 aiohttp==3.13.0
 
 azure_ai_agents==1.0.0

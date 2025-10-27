@@ -287,7 +287,7 @@ async def chat(
     app_insights_conn_str : str = Depends(get_app_insights_conn_str),
 	_ = auth_dependency
 ):
-    await request.app.state.config_provider.refresh()
+    request.app.state.config_provider.refresh()
     # Retrieve the thread ID from the cookies (if available).
     thread_id = request.cookies.get('thread_id')
     agent_id = request.cookies.get('agent_id')
