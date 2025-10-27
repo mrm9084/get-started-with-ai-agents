@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 from typing import AsyncGenerator, Optional, Dict
+import uuid
 
 import fastapi
 from fastapi import Request, Depends, HTTPException
@@ -85,8 +86,18 @@ def get_ai_project(request: Request) -> AIProjectClient:
 def get_agent_client(request: Request) -> AgentsClient:
     return request.app.state.agent_client
 
-def get_agent(request: Request) -> Agent:
-    return request.app.state.agent
+def get_agent(request: Request) -> tuple[Agent, str]:
+    session_id = request.cookies.get('session_id')
+    if not session_id:
+        session_id = str(uuid.uuid4())
+    assigned_agent_name = request.app.state.feature_manager.get_variant("AiModel", session_id).configuration
+    default_agent = request.app.state.agents[0] if request.app.state.agents else None
+    logger.info(f"Assigned agent: {assigned_agent_name}")
+    for agent in request.app.state.agents:
+        if agent.name == assigned_agent_name:
+            return agent, session_id
+    logger.warning(f"Assigned agent not found: {assigned_agent_name}")
+    return default_agent, session_id
 
 def get_app_insights_conn_str(request: Request) -> str:
     if hasattr(request.app.state, "application_insights_connection_string"):
@@ -227,10 +238,12 @@ async def get_result(
 async def history(
     request: Request,
     ai_project : AIProjectClient = Depends(get_ai_project),
-    agent : Agent = Depends(get_agent),
 	_ = auth_dependency
 ):
     with tracer.start_as_current_span("chat_history"):
+        # Get agent and session ID
+        agent, session_id = get_agent(request)
+        
         # Retrieve the thread ID from the cookies (if available).
         thread_id = request.cookies.get('thread_id')
         agent_id = request.cookies.get('agent_id')
@@ -267,9 +280,10 @@ async def history(
         logger.info(f"List message, thread ID: {thread_id}")
         response = JSONResponse(content=content)
     
-        # Update cookies to persist the thread and agent IDs.
+        # Update cookies to persist the thread, agent, and session IDs.
         response.set_cookie("thread_id", thread_id)
         response.set_cookie("agent_id", agent_id)
+        response.set_cookie("session_id", session_id)
         return response
     except Exception as e:
         logger.error(f"Error listing message: {e}")
@@ -279,16 +293,21 @@ async def history(
 async def get_chat_agent(
     request: Request
 ):
-    return JSONResponse(content=get_agent(request).as_dict())  
+    agent, _ = get_agent(request)
+    return JSONResponse(content=agent.as_dict())  
 
 @router.post("/chat")
 async def chat(
     request: Request,
-    agent : Agent = Depends(get_agent),
     ai_project: AIProjectClient = Depends(get_ai_project),
     app_insights_conn_str : str = Depends(get_app_insights_conn_str),
 	_ = auth_dependency
 ):
+    await request.app.state.config_provider.refresh()
+    
+    # Get agent and session ID
+    agent, session_id = get_agent(request)
+    
     # Retrieve the thread ID from the cookies (if available).
     thread_id = request.cookies.get('thread_id')
     agent_id = request.cookies.get('agent_id')
@@ -345,9 +364,10 @@ async def chat(
         # Create the streaming response using the generator.
         response = StreamingResponse(get_result(request, thread_id, agent_id, ai_project, app_insights_conn_str, carrier), headers=headers)
 
-        # Update cookies to persist the thread and agent IDs.
+        # Update cookies to persist the thread, agent, and session IDs.
         response.set_cookie("thread_id", thread_id)
         response.set_cookie("agent_id", agent_id)
+        response.set_cookie("session_id", session_id)
         return response
 
 def read_file(path: str) -> str:

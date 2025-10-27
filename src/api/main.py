@@ -6,24 +6,31 @@ import os
 
 from azure.ai.projects.aio import AIProjectClient
 from azure.identity import DefaultAzureCredential
+from azure.appconfiguration.provider.aio import load
+from featuremanagement import FeatureManager, TargetingContext
 
 import fastapi
 from fastapi.staticfiles import StaticFiles
 from fastapi import Request
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 
 from logging_config import configure_logging
 
 enable_trace = False
 logger = None
 
+
 @contextlib.asynccontextmanager
 async def lifespan(app: fastapi.FastAPI):
     agent = None
 
-    proj_endpoint = os.environ.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
-    agent_id = os.environ.get("AZURE_EXISTING_AGENT_ID")
+    endpoint =  os.environ.get("AZURE_APP_CONFIGURATION_ENDPOINT")
+
+    app.state.config_provider = await load(endpoint, DefaultAzureCredential(), feature_flag_enabled=True)
+    app.state.feature_manager = FeatureManager(app.state.config_provider)
+
+    proj_endpoint = app.state.config_provider.get("AZURE_EXISTING_AIPROJECT_ENDPOINT")
+    agent_id = app.state.config_provider.get("AZURE_EXISTING_AGENT_ID")
     try:
         ai_project = AIProjectClient(
             credential=DefaultAzureCredential(exclude_shared_token_cache_credential=True),
@@ -49,31 +56,23 @@ async def lifespan(app: fastapi.FastAPI):
                 app.state.application_insights_connection_string = application_insights_connection_string
                 logger.info("Configured Application Insights for tracing.")
 
+        app.state.agents = []
         if agent_id:
             try: 
                 agent = await ai_project.agents.get_agent(agent_id)
+                app.state.agents.append(agent)
                 logger.info("Agent already exists, skipping creation")
                 logger.info(f"Fetched agent, agent ID: {agent.id}")
                 logger.info(f"Fetched agent, model name: {agent.model}")
             except Exception as e:
                 logger.error(f"Error fetching agent: {e}", exc_info=True)
 
-        if not agent:
-            # Fallback to searching by name
-            agent_name = os.environ["AZURE_AI_AGENT_NAME"]
-            agent_list = ai_project.agents.list_agents()
-            if agent_list:
-                async for agent_object in agent_list:
-                    if agent_object.name == agent_name:
-                        agent = agent_object
-                        logger.info(f"Found agent by name '{agent_name}', ID={agent_object.id}")
-                        break
-
-        if not agent:
-            raise RuntimeError("No agent found. Ensure qunicorn.py created one or set AZURE_EXISTING_AGENT_ID.")
+        agent_list = ai_project.agents.list_agents()
+        if agent_list:
+            async for agent_object in agent_list:
+                app.state.agents.append(agent_object)
 
         app.state.ai_project = ai_project
-        app.state.agent = agent
         
         yield
 
@@ -90,9 +89,6 @@ async def lifespan(app: fastapi.FastAPI):
 
 
 def create_app():
-    if not os.getenv("RUNNING_IN_PRODUCTION"):
-        load_dotenv(override=True)
-
     global logger
     logger = configure_logging(os.getenv("APP_LOG_FILE", ""))
 
